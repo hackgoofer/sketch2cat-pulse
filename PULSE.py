@@ -11,17 +11,18 @@ from drive import open_url
 
 
 class PULSE(torch.nn.Module):
-    def __init__(self, cache_dir, verbose=True):
-        super(PULSE, self).__init__()
+    def __init__(self, cache_dir, resolution=1024, verbose=True):
+        super().__init__()
 
-        self.synthesis = G_synthesis().cuda()
+        self.synthesis = G_synthesis(resolution=resolution).cuda()
         self.verbose = verbose
 
         cache_dir = Path(cache_dir)
         cache_dir.mkdir(parents=True, exist_ok = True)
         if self.verbose: print("Loading Synthesis Network")
-        with open_url("https://drive.google.com/uc?id=1TCViX1YpQyRsklTVYEJwdbmK91vklCo8", cache_dir=cache_dir, verbose=verbose) as f:
-            self.synthesis.load_state_dict(torch.load(f))
+#         with open_url("https://drive.google.com/uc?id=1TCViX1YpQyRsklTVYEJwdbmK91vklCo8", cache_dir=cache_dir, verbose=verbose) as f:
+        f = cache_dir / "synthesis.pt"
+        self.synthesis.load_state_dict(torch.load(f))
 
         for param in self.synthesis.parameters():
             param.requires_grad = False
@@ -34,8 +35,9 @@ class PULSE(torch.nn.Module):
             if self.verbose: print("\tLoading Mapping Network")
             mapping = G_mapping().cuda()
 
-            with open_url("https://drive.google.com/uc?id=14R6iHGf5iuVx3DMNsACAl7eBr7Vdpd0k", cache_dir=cache_dir, verbose=verbose) as f:
-                    mapping.load_state_dict(torch.load(f))
+#             with open_url("https://drive.google.com/uc?id=14R6iHGf5iuVx3DMNsACAl7eBr7Vdpd0k", cache_dir=cache_dir, verbose=verbose) as f:
+            f = cache_dir / "mapping.pt"
+            mapping.load_state_dict(torch.load(f))
 
             if self.verbose: print("\tRunning Mapping Network")
             with torch.no_grad():

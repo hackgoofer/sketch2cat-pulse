@@ -5,3 +5,4 @@ runs/*
 input/*
 cache/*
 realpics/*
+.ipynb_checkpoints/*

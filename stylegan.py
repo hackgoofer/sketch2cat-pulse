@@ -148,7 +148,6 @@ class PixelNormLayer(nn.Module):
 class BlurLayer(nn.Module):
     def __init__(self, kernel=[1, 2, 1], normalize=True, flip=False, stride=1):
         super(BlurLayer, self).__init__()
-        kernel = [1, 2, 1]
         kernel = torch.tensor(kernel, dtype=torch.float32)
         kernel = kernel[:, None] * kernel[None, :]
         kernel = kernel[None, None]
