@@ -12,7 +12,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 
 from torchvision.transforms import transforms
-import torchgeometry as tgm
+import kornia as tgm
 
 from model import DexiNet
 from losses import weighted_cross_entropy_loss
