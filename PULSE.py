@@ -5,16 +5,16 @@ from pathlib import Path
 import numpy as np
 import time
 import torch
-from loss import LossBuilder
+from edge_loss import EdgeLossBuilder
 from functools import partial
 from drive import open_url
 
 
 class PULSE(torch.nn.Module):
-    def __init__(self, cache_dir, resolution=1024, verbose=True):
+    def __init__(self, cache_dir, resolution=1024, device="cuda", verbose=True):
         super().__init__()
 
-        self.synthesis = G_synthesis(resolution=resolution).cuda()
+        self.synthesis = G_synthesis(resolution=resolution).to(device)
         self.verbose = verbose
 
         cache_dir = Path(cache_dir)
@@ -33,7 +33,7 @@ class PULSE(torch.nn.Module):
             self.gaussian_fit = torch.load("gaussian_fit.pt")
         else:
             if self.verbose: print("\tLoading Mapping Network")
-            mapping = G_mapping().cuda()
+            mapping = G_mapping().to(device)
 
 #             with open_url("https://drive.google.com/uc?id=14R6iHGf5iuVx3DMNsACAl7eBr7Vdpd0k", cache_dir=cache_dir, verbose=verbose) as f:
             f = cache_dir / "mapping.pt"
@@ -42,7 +42,7 @@ class PULSE(torch.nn.Module):
             if self.verbose: print("\tRunning Mapping Network")
             with torch.no_grad():
                 torch.manual_seed(0)
-                latent = torch.randn((1000000,512),dtype=torch.float32, device="cuda")
+                latent = torch.randn((1000000,512),dtype=torch.float32, device=device)
                 latent_out = torch.nn.LeakyReLU(5)(mapping(latent))
                 self.gaussian_fit = {"mean": latent_out.mean(0), "std": latent_out.std(0)}
                 torch.save(self.gaussian_fit,"gaussian_fit.pt")
@@ -61,6 +61,7 @@ class PULSE(torch.nn.Module):
                 steps,
                 lr_schedule,
                 save_intermediate,
+                device,
                 **kwargs):
 
         if seed:
@@ -73,10 +74,10 @@ class PULSE(torch.nn.Module):
         # Generate latent tensor
         if(tile_latent):
             latent = torch.randn(
-                (batch_size, 1, 512), dtype=torch.float, requires_grad=True, device='cuda')
+                (batch_size, 1, 512), dtype=torch.float, requires_grad=True, device=device)
         else:
             latent = torch.randn(
-                (batch_size, 18, 512), dtype=torch.float, requires_grad=True, device='cuda')
+                (batch_size, 18, 512), dtype=torch.float, requires_grad=True, device=device)
 
         # Generate list of noise tensors
         noise = [] # stores all of the noise tensors
@@ -87,13 +88,13 @@ class PULSE(torch.nn.Module):
             res = (batch_size, 1, 2**(i//2+2), 2**(i//2+2))
 
             if(noise_type == 'zero' or i in [int(layer) for layer in bad_noise_layers.split('.')]):
-                new_noise = torch.zeros(res, dtype=torch.float, device='cuda')
+                new_noise = torch.zeros(res, dtype=torch.float, device=device)
                 new_noise.requires_grad = False
             elif(noise_type == 'fixed'):
-                new_noise = torch.randn(res, dtype=torch.float, device='cuda')
+                new_noise = torch.randn(res, dtype=torch.float, device=device)
                 new_noise.requires_grad = False
             elif (noise_type == 'trainable'):
-                new_noise = torch.randn(res, dtype=torch.float, device='cuda')
+                new_noise = torch.randn(res, dtype=torch.float, device=device)
                 if (i < num_trainable_noise_layers):
                     new_noise.requires_grad = True
                     noise_vars.append(new_noise)
@@ -123,7 +124,7 @@ class PULSE(torch.nn.Module):
         schedule_func = schedule_dict[lr_schedule]
         scheduler = torch.optim.lr_scheduler.LambdaLR(opt.opt, schedule_func)
         
-        loss_builder = LossBuilder(ref_im, loss_str, eps).cuda()
+        loss_builder = EdgeLossBuilder(ref_im, loss_str, eps).to(device)
 
         min_loss = np.inf
         min_l2 = np.inf
@@ -143,7 +144,7 @@ class PULSE(torch.nn.Module):
                 latent_in = latent
 
             # Apply learned linear mapping to match latent distribution to that of the mapping network
-            latent_in = self.lrelu(latent_in*self.gaussian_fit["std"] + self.gaussian_fit["mean"])
+            latent_in = self.lrelu(latent_in*self.gaussian_fit["std"].to(device) + self.gaussian_fit["mean"].to(device))
 
             # Normalize image to [0,1] instead of [-1,1]
             gen_im = (self.synthesis(latent_in, noise)+1)/2
@@ -175,7 +176,7 @@ class PULSE(torch.nn.Module):
         total_t = time.time()-start_t
         current_info = f' | time: {total_t:.1f} | it/s: {(j+1)/total_t:.2f} | batchsize: {batch_size}'
         if self.verbose: print(best_summary+current_info)
-        if(min_l2 <= eps):
-            yield (gen_im.clone().cpu().detach().clamp(0, 1),loss_builder.D(best_im).cpu().detach().clamp(0, 1))
-        else:
-            print("Could not find a face that downscales correctly within epsilon")
+#         if(min_l2 <= eps):
+        yield (gen_im.clone().cpu().detach().clamp(0, 1),loss_builder.D(best_im).cpu().detach().clamp(0, 1))
+#         else:
+#             print("Could not find a face that downscales correctly within epsilon")
