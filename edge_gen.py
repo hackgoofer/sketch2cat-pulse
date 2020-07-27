@@ -6,11 +6,12 @@ import PIL
 import numpy as np
 
 class EdgeGen(nn.Module):
-    def __init__(self, factor=4):
+    def __init__(self, device="cpu"):
         super().__init__()
         DexiModule = importlib.import_module("DexiNed.DexiNed-Pytorch.model")
         self.edge_model = DexiModule.DexiNet()
         self.edge_model.load_state_dict(torch.load("DexiNed/DexiNed-Pytorch/checkpoints/24/24_model.pth"))
+        self.edge_model.to(device)
         bgr_mean = [104.00699, 116.66877, 122.67892]
         self.rgb_mean = torch.tensor(bgr_mean[::-1]).reshape(1, 3, 1, 1)
         self.edge_model.eval()

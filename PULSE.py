@@ -62,6 +62,7 @@ class PULSE(torch.nn.Module):
                 lr_schedule,
                 save_intermediate,
                 device,
+                bce_fn,
                 **kwargs):
 
         if seed:
@@ -111,7 +112,8 @@ class PULSE(torch.nn.Module):
             'sgd': torch.optim.SGD,
             'adam': torch.optim.Adam,
             'sgdm': partial(torch.optim.SGD, momentum=0.9),
-            'adamax': torch.optim.Adamax
+            'adamax': torch.optim.Adamax,
+            'diogo': partial(torch.optim.AdamW, betas=(0.9, 0.99), weight_decay=0.1),
         }
         opt_func = opt_dict[opt_name]
         opt = SphericalOptimizer(opt_func, var_list, lr=learning_rate)
@@ -124,7 +126,7 @@ class PULSE(torch.nn.Module):
         schedule_func = schedule_dict[lr_schedule]
         scheduler = torch.optim.lr_scheduler.LambdaLR(opt.opt, schedule_func)
         
-        loss_builder = EdgeLossBuilder(ref_im, loss_str, eps).to(device)
+        loss_builder = EdgeLossBuilder(ref_im, loss_str, eps, bce_fn).to(device)
 
         min_loss = np.inf
         min_l2 = np.inf
@@ -152,7 +154,8 @@ class PULSE(torch.nn.Module):
             # Calculate Losses
             loss, loss_dict = loss_builder(latent_in, gen_im)
             loss_dict['TOTAL'] = loss
-
+            print(f"step: {j}, loss: {loss}")
+            
             # Save best summary for log
             if(loss < min_loss):
                 min_loss = loss
@@ -177,6 +180,6 @@ class PULSE(torch.nn.Module):
         current_info = f' | time: {total_t:.1f} | it/s: {(j+1)/total_t:.2f} | batchsize: {batch_size}'
         if self.verbose: print(best_summary+current_info)
 #         if(min_l2 <= eps):
-        yield (gen_im.clone().cpu().detach().clamp(0, 1),loss_builder.D(best_im).cpu().detach().clamp(0, 1))
+        yield (best_im.clone().cpu().detach().clamp(0, 1),loss_builder.D(best_im).cpu().detach().clamp(0, 1))
 #         else:
 #             print("Could not find a face that downscales correctly within epsilon")

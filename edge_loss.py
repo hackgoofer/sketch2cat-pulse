@@ -2,16 +2,14 @@ import torch
 from edge_gen import EdgeGen
 
 class EdgeLossBuilder(torch.nn.Module):
-    def __init__(self, ref_im, loss_str, eps):
+    def __init__(self, ref_im, loss_str, eps, bce_fn=None):
         super().__init__()
         assert ref_im.shape[2]==ref_im.shape[3]
-        im_size = ref_im.shape[2]
-        factor=1024//im_size
-        assert im_size*factor==1024
-        self.D = EdgeGen(factor=factor)
+        self.D = EdgeGen(ref_im.device)
         self.ref_im = ref_im
         self.parsed_loss = [loss_term.split('*') for loss_term in loss_str.split('+')]
         self.eps = eps
+        self.bce_fn = bce_fn
 
     # Takes a list of tensors, flattens them, and concatenates them into a vector
     # Used to calculate euclidian distance between lists of tensors
@@ -41,6 +39,7 @@ class EdgeLossBuilder(torch.nn.Module):
     def forward(self, latent, gen_im):
         var_dict = {'latent': latent,
                     'gen_im_lr': self.D(gen_im),
+                    'gen_im': gen_im,
                     'ref_im': self.ref_im,
                     }
         loss = 0
@@ -48,6 +47,7 @@ class EdgeLossBuilder(torch.nn.Module):
             'L2': self._loss_l2,
             'L1': self._loss_l1,
             'GEOCROSS': self._loss_geocross,
+            'BCE': self.bce_fn,
         }
         losses = {}
         for weight, loss_type in self.parsed_loss:

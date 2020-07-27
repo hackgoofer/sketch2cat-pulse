@@ -6,3 +6,6 @@ input/*
 cache/*
 realpics/*
 .ipynb_checkpoints/*
+sketches/*
+DexiNed/DexiNed-Pytorch/results/*
+DexiNed/DexiNed-Pytorch/cats_generation/*
