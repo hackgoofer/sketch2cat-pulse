@@ -9,3 +9,5 @@ realpics/*
 sketches/*
 DexiNed/DexiNed-Pytorch/results/*
 DexiNed/DexiNed-Pytorch/cats_generation/*
+*.pyc
+U-2-Net/saved_models/*
